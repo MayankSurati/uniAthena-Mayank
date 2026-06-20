@@ -1,63 +1,485 @@
-<<<<<<< HEAD
-# uniAthena-Mayank
-Appointment Booking System
-=======
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Appointment Booking System
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+A scalable Appointment Booking System built with Laravel 13 using Service-Repository Pattern, Queue Jobs, Events, Listeners, Transactions, and REST APIs.
 
-## About Laravel
+---
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## Features
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+### Doctor Availability
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+Doctors can define their availability with:
 
-## Learning Laravel
+- Date
+- Start Time
+- End Time
+- Slot Duration
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+Example:
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
-
-```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+```text
+Date: 2026-06-20
+Start Time: 09:00 AM
+End Time: 12:00 PM
+Slot Duration: 30 Minutes
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+---
 
-## Contributing
+### Automatic Slot Generation
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+Availability automatically generates appointment slots.
 
-## Code of Conduct
+Example:
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+```text
+09:00 - 09:30
+09:30 - 10:00
+10:00 - 10:30
+10:30 - 11:00
+11:00 - 11:30
+11:30 - 12:00
+```
 
-## Security Vulnerabilities
+Slot generation runs through Laravel Queue Jobs.
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+---
 
-## License
+### Appointment Booking
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
->>>>>>> 6eda732 (Appointment Booking System)
+Patients can:
+
+- View available slots
+- Book appointments
+- Receive booking reference number
+
+Example Response:
+
+```json
+{
+    "success": true,
+    "message": "Appointment booked successfully",
+    "data": {
+        "reference_no": "APT-20260620-0001"
+    }
+}
+```
+
+---
+
+### Prevent Double Booking
+
+System prevents duplicate bookings using:
+
+- Database Transactions
+- Row Level Locking (`lockForUpdate`)
+- Slot Status Management
+
+---
+
+### Appointment Cancellation
+
+Patients can cancel appointments.
+
+When cancelled:
+
+- Appointment status becomes `cancelled`
+- Slot becomes available again
+
+---
+
+### Appointment Rescheduling
+
+Patients can reschedule appointments.
+
+Flow:
+
+```text
+Old Slot -> Available
+New Slot -> Booked
+Appointment -> Updated
+History -> Created
+Notification -> Sent
+```
+
+---
+
+### Appointment History
+
+All appointment actions are tracked.
+
+Supported actions:
+
+```text
+booked
+cancelled
+rescheduled
+completed
+no_show
+```
+
+---
+
+## Tech Stack
+
+- Laravel 13
+- MySQL 8+
+- Laravel Sanctum
+- Queue Jobs
+- Events & Listeners
+- Service Layer
+- Repository Pattern
+
+---
+
+# Database Design
+
+## Tables
+
+```text
+users
+doctors
+doctor_availabilities
+appointment_slots
+appointments
+appointment_histories
+```
+
+---
+
+## users
+
+Stores patients and administrators.
+
+| Column | Type |
+|----------|----------|
+| id | bigint |
+| name | string |
+| email | string |
+| password | string |
+| role | enum |
+
+---
+
+## doctors
+
+Stores doctor information.
+
+| Column | Type |
+|----------|----------|
+| id | bigint |
+| name | string |
+| email | string |
+
+---
+
+## doctor_availabilities
+
+Stores doctor schedules.
+
+| Column | Type |
+|----------|----------|
+| doctor_id | FK |
+| date | date |
+| start_time | time |
+| end_time | time |
+| slot_duration | integer |
+
+---
+
+## appointment_slots
+
+Stores generated slots.
+
+| Column | Type |
+|----------|----------|
+| doctor_id | FK |
+| availability_id | FK |
+| start_at | datetime |
+| end_at | datetime |
+| status | enum |
+
+---
+
+## appointments
+
+Stores booking information.
+
+| Column | Type |
+|----------|----------|
+| reference_no | string |
+| patient_id | FK |
+| doctor_id | FK |
+| appointment_slot_id | FK |
+| status | enum |
+
+---
+
+## appointment_histories
+
+Stores audit logs.
+
+| Column | Type |
+|----------|----------|
+| appointment_id | FK |
+| action | string |
+| old_data | json |
+| new_data | json |
+
+---
+
+# Architecture
+
+```text
+Controller
+    ↓
+Request Validation
+    ↓
+Service Layer
+    ↓
+Repository Layer
+    ↓
+Database
+    ↓
+Resource
+    ↓
+JSON Response
+```
+
+---
+
+# Folder Structure
+
+```text
+app
+├── Events
+├── Listeners
+├── Jobs
+├── Models
+├── Repositories
+├── Services
+├── Http
+│   ├── Controllers
+│   ├── Requests
+│   └── Resources
+```
+
+---
+
+# API Endpoints
+
+## Authentication
+
+### Register
+
+```http
+POST /api/register
+```
+
+### Login
+
+```http
+POST /api/login
+```
+
+### Logout
+
+```http
+POST /api/logout
+```
+
+---
+
+## Doctors
+
+### Get Doctors
+
+```http
+GET /api/doctors
+```
+
+---
+
+## Doctor Availability
+
+### Create Availability
+
+```http
+POST /api/doctor-availabilities
+```
+
+Request:
+
+```json
+{
+    "doctor_id": 1,
+    "date": "2026-06-20",
+    "start_time": "09:00",
+    "end_time": "12:00",
+    "slot_duration": 30
+}
+```
+
+---
+
+## Slots
+
+### Get Available Slots
+
+```http
+GET /api/doctors/{doctor_id}/slots
+```
+
+---
+
+## Appointments
+
+### Book Appointment
+
+```http
+POST /api/appointments
+```
+
+Request:
+
+```json
+{
+    "doctor_id": 1,
+    "patient_id": 1,
+    "slot_id": 5
+}
+```
+
+---
+
+### Cancel Appointment
+
+```http
+POST /api/appointments/{id}/cancel
+```
+
+---
+
+### Reschedule Appointment
+
+```http
+POST /api/appointments/{id}/reschedule
+```
+
+Request:
+
+```json
+{
+    "appointment_slot_id": 10
+}
+```
+
+---
+
+# Booking Flow
+
+```text
+Doctor Creates Availability
+            ↓
+Generate Slots Job
+            ↓
+Patient Views Slots
+            ↓
+Patient Books Slot
+            ↓
+Slot Locked
+            ↓
+Appointment Created
+            ↓
+Event Triggered
+            ↓
+Notification Sent
+```
+
+---
+
+# Reschedule Flow
+
+```text
+Fetch Appointment
+        ↓
+Lock New Slot
+        ↓
+Validate Slot
+        ↓
+Release Old Slot
+        ↓
+Book New Slot
+        ↓
+Update Appointment
+        ↓
+Create History
+        ↓
+Dispatch Event
+        ↓
+Send Notification
+```
+
+---
+
+# Queue Configuration
+
+Run Queue Worker:
+
+```bash
+php artisan queue:work
+```
+
+---
+
+# Installation
+
+Clone Repository
+
+```bash
+git clone https://github.com/MayankSurati/uniAthena-Mayank
+```
+
+Run Migration
+
+```bash
+php artisan migrate
+```
+
+Run Seeder
+
+```bash
+php artisan db:seed
+```
+
+Start Queue
+
+```bash
+php artisan queue:work
+```
+
+Start Application
+
+```bash
+php artisan serve
+```
+
+---
+
+# Scalability Considerations
+
+- Service Repository Pattern
+- Queue Based Slot Generation
+- Transaction Based Booking
+- Row Level Locking
+- Database Indexing
+- Audit History Tracking
+- Event Driven Notifications
+- Optimized for Millions of Records
+
+---
+
+# Author
+
+Mayank Surati
+Senior Laravel Developer
