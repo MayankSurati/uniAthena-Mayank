@@ -32,3 +32,28 @@ Route::middleware([
         Route::post('appointment/{doctor}/cancel', [AppointmentController::class, 'cancel']);
         Route::post('appointment/{doctor}/reschedule', [AppointmentController::class, 'reschedule']);
 });
+
+Route::middleware([
+    'auth:sanctum',
+    'role:doctor'
+    ])->group(function () {
+        
+        Route::apiResource('doctors', DoctorController::class);
+
+        Route::get('doctors/{doctor}/{date}', [DoctorController::class, 'getSlots']);
+
+        Route::apiResource('doctor-availability', DoctorAvailabilityScheduleController::class);
+});
+
+Route::middleware([
+    'auth:sanctum',
+    'role:patient'
+    ])->group(function () {
+        
+        Route::apiResource('appointment', AppointmentController::class);
+
+        Route::post('appointment/{doctor}/cancel', [AppointmentController::class, 'cancel']);
+        Route::post('appointment/{doctor}/reschedule', [AppointmentController::class, 'reschedule']);
+});
+
+
