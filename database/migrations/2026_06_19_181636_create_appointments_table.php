@@ -26,7 +26,8 @@ return new class extends Migration
 
             $table->foreignId('appointment_slot_id')
                 ->constrained('appointment_slots')
-                ->cascadeOnDelete();
+                ->cascadeOnDelete()
+                ->unique();
 
             $table->enum('status', [
                 'booked',
@@ -41,10 +42,6 @@ return new class extends Migration
 
             $table->index([
                 'doctor_id',
-                'status'
-            ]);
-
-            $table->index([
                 'patient_id',
                 'status'
             ]);

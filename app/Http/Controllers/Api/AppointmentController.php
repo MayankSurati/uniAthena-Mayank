@@ -7,9 +7,10 @@ use Illuminate\Http\Request;
 use App\Traits\ApiResponse;
 use App\Services\AppointmentService;
 use App\Http\Requests\AppointmentsRequest;
-use App\Http\Resources\AppointmentResource;
 use App\Http\Requests\CancelAppointmentRequest;
 use App\Http\Requests\RescheduleAppointmentRequest;
+use App\Http\Resources\AppointmentResource;
+use App\Http\Resources\AppointmentListResource;
 
 class AppointmentController extends Controller
 {
@@ -25,7 +26,7 @@ class AppointmentController extends Controller
         $appointments = $this->appointmentService->getAppointments();
         return $this->successResponse(
             $appointments,
-            AppointmentResource::collection($appointments->items()),
+            AppointmentListResource::collection($appointments->items()),
             'Appointments Fetched Successfully',
         );
     }
@@ -38,12 +39,10 @@ class AppointmentController extends Controller
         $appointment = $this->appointmentService->createAppointment($appointmentsRequest->validated());
 
         return response()->json([
-            'success' => $appointment['success'] ?? true,
-            'message' => $appointment['message'] ?? 'Success',
-            'data' => empty($appointment['data'])
-                ? new AppointmentResource($appointment)
-                : [],
-        ]);
+            'success' => $appointment['success'],
+            'message' => $appointment['message'],
+            'data' => $appointment['data']
+        ], $appointment['status_code']);
     }
 
     /**
@@ -83,12 +82,10 @@ class AppointmentController extends Controller
         $cancel = $this->appointmentService->cancelAppointment($id, $cancelRequest->validated());
 
         return response()->json([
-            'success' => $cancel['success'] ?? true,
-            'message' => $cancel['message'] ?? 'Success',
-            'data' => empty($cancel['data'])
-                ? new AppointmentResource($cancel)
-                : [],
-        ]);
+            'success' => true,
+            'message' => 'Appointment cancelled successfully.',
+            'data' => new AppointmentResource($cancel),
+        ], 200);
     }
 
     /**
@@ -97,13 +94,11 @@ class AppointmentController extends Controller
     public function reschedule(RescheduleAppointmentRequest $rescheduleRequest, int $id)
     {
         $reschedule = $this->appointmentService->rescheduleAppointment($id, $rescheduleRequest->validated());
-
+        
         return response()->json([
-            'success' => $reschedule['success'] ?? true,
-            'message' => $reschedule['message'] ?? 'Success',
-            'data' => empty($reschedule['data'])
-                ? new AppointmentResource($reschedule)
-                : [],
-        ]);
+            'success' => true,
+            'message' => 'Appointment rescheduled successfully',
+            'data' => new AppointmentResource($reschedule),
+        ], 200);
     }
 }

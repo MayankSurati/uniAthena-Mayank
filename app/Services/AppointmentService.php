@@ -3,18 +3,26 @@
 namespace App\Services;
 
 use App\Repositories\AppointmentRepository;
+use App\Repositories\AppointmentSlotRepository;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
 use App\Models\Appointment;
+use Illuminate\Support\Facades\DB;
+use App\Events\AppointmentBooked;
+use App\Events\AppointmentRescheduled;
+use App\Events\AppointmentCancelled;
+use App\Http\Resources\AppointmentResource;
+use App\Exceptions\SlotUnavailableException;
 
 class AppointmentService
 {
     public function __construct(
-        protected AppointmentRepository $appointmentRepository
+        private AppointmentRepository $appointmentRepository,
+        private AppointmentSlotRepository $appointmentSlotRepository
     ) {
     }
 
-     public function getAppointments()
+    public function getAppointments()
     {
         return $this->appointmentRepository->getAll();
     }
@@ -26,10 +34,65 @@ class AppointmentService
 
     public function createAppointment(array $data)
     {
-        $data['reference_no'] = $this->generateAppointmentReference();
-        $data['patient_id'] = auth()->id();
+        return DB::transaction(function () use ($data) {
 
-        return $this->appointmentRepository->create($data);
+            $slot = $this->appointmentSlotRepository
+                ->findByIdForUpdate(
+                    $data['appointment_slot_id']
+                );
+
+            if (! $slot) {
+                return [
+                    'success' => false,
+                    'message' => 'Slot not found.',
+                    'data' => [],
+                    'status_code' => 400
+                ];
+            }
+
+            if ($slot->status !== 'available') {
+                return [
+                    'success' => false,
+                    'message' => 'This slot is already booked.',
+                    'data' => [],
+                    'status_code' => 201
+                ];
+            }
+
+            $appointment = $this->appointmentRepository
+                ->create([
+                    'reference_no' => $this->generateAppointmentReference(),
+                    'patient_id' => auth()->user()->id,
+                    'doctor_id' => $data['doctor_id'],
+                    'appointment_slot_id' => $slot->id,
+                    'notes' => $data['notes'] ?? null,
+                    'status' => 'booked',
+                ]);
+
+            $this->appointmentSlotRepository->update(
+                $slot->id,
+                [
+                    'status' => 'booked'
+                ]
+            );
+
+            DB::afterCommit(function () use ($appointment) {
+                AppointmentBooked::dispatch($appointment);
+            });
+
+            $appointment->load([
+                'patient',
+                'doctor',
+                'slot'
+            ]);
+
+            return [
+                'success' => true,
+                'message' => 'Appointment booked successfully.',
+                'data' => new AppointmentResource($appointment),
+                'status_code' => 200
+            ];
+        });
     }
 
     public function updateAppointment(int $id, array $data)
@@ -61,13 +124,97 @@ class AppointmentService
         );
     }
 
-    public function cancelAppointment(int $id, array $reason)
+    public function cancelAppointment(int $id, array $data)
     {
-        return $this->appointmentRepository->cancel($id, $reason);
+        $appointment = $this->appointmentRepository
+        ->findWithRelations($id);
+
+        if ($appointment->status === 'cancelled') {
+            throw new SlotUnavailableException(
+                'Appointment already cancelled.'
+            );
+        }
+
+        $appointment = DB::transaction(function () use ($appointment, $data) {
+
+            $this->appointmentRepository->cancel(
+                $appointment,
+                $data['cancellation_reason']
+            );
+            
+            $this->appointmentSlotRepository->update(
+                $appointment->appointment_slot_id,
+                [
+                    'status' => 'available'
+                ]
+            );
+
+            return $this->appointmentRepository->refresh(
+                $appointment->id
+            );
+        });
+
+        AppointmentCancelled::dispatch($appointment);
+
+        return $appointment;
     }
 
-    public function rescheduleAppointment(int $id, array $newSlotId)
+    public function rescheduleAppointment(int $appointmentId, array $data)
     {
-        return $this->appointmentRepository->reschedule($id, $newSlotId);
+        return DB::transaction(function () use ($appointmentId, $data) {
+
+            $appointment = $this->appointmentRepository
+                ->findAppointmentForUpdate($appointmentId);
+
+            $newSlot = $this->appointmentRepository
+                ->findSlotForUpdate(
+                    $data['appointment_slot_id']
+                );
+
+            if ($newSlot->status !== 'available')
+            {
+                throw new SlotUnavailableException(
+                    'The selected appointment slot is no longer available. Please choose another slot.'
+                );
+            }
+
+            if ($appointment->appointment_slot_id === $newSlot->id)
+            {
+                throw new SlotUnavailableException(
+                    'Appointment is already assigned to this slot.'
+                );
+            }
+
+            $oldSlot = $this->appointmentRepository
+                ->findSlotForUpdate($appointment->appointment_slot_id);
+
+            $this->appointmentRepository->updateSlot(
+                $oldSlot,
+                ['status' => 'available']
+            );
+
+            $this->appointmentRepository->updateSlot(
+                $newSlot,
+                ['status' => 'booked']
+            );
+
+            $this->appointmentRepository->updateAppointment(
+                $appointment,
+                [
+                    'appointment_slot_id' => $newSlot->id,
+                    'status' => 'rescheduled',
+                ]
+            );
+
+            $appointment->fresh([
+                'patient',
+                'doctor',
+                'slot'
+            ]);
+
+            AppointmentRescheduled::dispatch($appointment);
+
+            return $appointment;    
+        });
     }
 }

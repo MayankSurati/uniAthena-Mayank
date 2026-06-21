@@ -2,7 +2,7 @@
 
 namespace App\Listeners;
 
-use App\Events\AppointmentReschedule;
+use App\Events\AppointmentRescheduled;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\InteractsWithQueue;
 use App\Mail\AppointmentRescheduleMail;
@@ -23,7 +23,7 @@ class SendAppointmentRescheduleEmail implements ShouldQueue
     /**
      * Handle the event.
      */
-    public function handle(AppointmentReschedule $event): void
+    public function handle(AppointmentRescheduled $event): void
     {
         Mail::to($event->appointment->patient->email)
             ->queue(new AppointmentRescheduleMail(
