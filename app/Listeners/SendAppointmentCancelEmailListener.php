@@ -2,13 +2,13 @@
 
 namespace App\Listeners;
 
-use App\Events\AppointmentCancel;
+use App\Events\AppointmentCancelled;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\InteractsWithQueue;
-use App\Mail\AppointmentBookedMail;
+use App\Mail\AppointmentCancelMail;
 use Illuminate\Support\Facades\Mail;
 
-class SendAppointmentCancelEmail implements ShouldQueue
+class SendAppointmentCancelEmailListener implements ShouldQueue
 {
     use InteractsWithQueue;
     
@@ -23,10 +23,10 @@ class SendAppointmentCancelEmail implements ShouldQueue
     /**
      * Handle the event.
      */
-    public function handle(AppointmentCancel $event): void
+    public function handle(AppointmentCancelled $event): void
     {
         Mail::to($event->appointment->patient->email)
-            ->queue(new AppointmentBookedMail(
+            ->queue(new AppointmentCancelMail(
                 $event->appointment
             )
         );

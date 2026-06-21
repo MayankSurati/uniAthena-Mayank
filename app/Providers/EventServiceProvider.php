@@ -13,7 +13,8 @@ use App\Listeners\RescheduleAppointmentHistory;
 use App\Listeners\SendAppointmentRescheduleEmail;
 
 use App\Listeners\CancelAppointmentHistoryListener;
-use App\Listeners\SendAppointmentCancelledEmailListener;
+use App\Listeners\SendAppointmentCancelEmailListener;
+
 
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
 
@@ -28,7 +29,7 @@ class EventServiceProvider extends ServiceProvider
 
         AppointmentCancelled::class => [
             CancelAppointmentHistoryListener::class,
-            SendAppointmentCancelledEmailListener::class,
+            SendAppointmentCancelEmailListener::class,
         ],
 
         AppointmentResscheduled::class => [

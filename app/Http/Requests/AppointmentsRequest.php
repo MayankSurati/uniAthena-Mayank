@@ -24,8 +24,8 @@ class AppointmentsRequest extends FormRequest
     {
         return [
             'doctor_id' => ['required','exists:doctors,id'],
-            'appointment_slot_id' => ['required'],
-            'notes' => ['required',],
+            'appointment_slot_id' => ['required', 'exists:appointment_slots,id'],
+            'notes' => ['required', 'nullable', 'string'],
         ];
     }
 }

@@ -35,7 +35,7 @@ Route::middleware([
 
 Route::middleware([
     'auth:sanctum',
-    'role:doctor'
+    'role:admin'
     ])->group(function () {
         
         Route::apiResource('doctors', DoctorController::class);
@@ -43,12 +43,16 @@ Route::middleware([
         Route::get('doctors/{doctor}/{date}', [DoctorController::class, 'getSlots']);
 
         Route::apiResource('doctor-availability', DoctorAvailabilityScheduleController::class);
+
+        Route::apiResource('appointment', AppointmentController::class);
 });
 
 Route::middleware([
     'auth:sanctum',
     'role:patient'
     ])->group(function () {
+
+        Route::get('doctors/{doctor}/{date}', [DoctorController::class, 'getSlots']);
         
         Route::apiResource('appointment', AppointmentController::class);
 

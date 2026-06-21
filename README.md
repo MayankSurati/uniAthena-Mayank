@@ -1,34 +1,58 @@
 # Appointment Booking System
 
-A scalable Appointment Booking System built with Laravel 13 using Service-Repository Pattern, Queue Jobs, Events, Listeners, Transactions, and REST APIs.
+## Overview
+
+A scalable Appointment Booking System built using Laravel 13. The system allows doctors to define their availability, automatically generates appointment slots, enables patients to book appointments, and supports cancellation and rescheduling while preventing double bookings.
+
+The solution follows industry-standard architecture patterns including:
+
+* Service Repository Pattern
+* Event-Driven Architecture
+* Queue-Based Processing
+* Transaction Management
+* Row-Level Locking
+* RESTful APIs
+* Laravel Sanctum Authentication
 
 ---
 
-## Features
+# Features
 
-### Doctor Availability
+## Sanctum Authentication
 
-Doctors can define their availability with:
+Laravel Sanctum was selected because:
 
-- Date
-- Start Time
-- End Time
-- Slot Duration
+- Native Laravel package
+- Lightweight token authentication
+- Easy token revocation
+- Suitable for mobile and SPA clients
+- Minimal configuration overhead
+
+This project uses Personal Access Tokens with Bearer authentication for all protected endpoints.
+
+## Doctor Availability Management
+
+Doctors can create availability schedules by specifying:
+
+* Date
+* Start Time
+* End Time
+* Slot Duration
 
 Example:
 
 ```text
 Date: 2026-06-20
-Start Time: 09:00 AM
-End Time: 12:00 PM
+Start Time: 09:00
+End Time: 12:00
 Slot Duration: 30 Minutes
 ```
 
 ---
 
-### Automatic Slot Generation
+## Automatic Slot Generation
 
-Availability automatically generates appointment slots.
+When availability is created, appointment slots are automatically generated using a background queue job.
 
 Example:
 
@@ -41,72 +65,33 @@ Example:
 11:30 - 12:00
 ```
 
-Slot generation runs through Laravel Queue Jobs.
-
 ---
 
-### Appointment Booking
+## Appointment Management
 
 Patients can:
 
-- View available slots
-- Book appointments
-- Receive booking reference number
-
-Example Response:
-
-```json
-{
-    "success": true,
-    "message": "Appointment booked successfully",
-    "data": {
-        "reference_no": "APT-20260620-0001"
-    }
-}
-```
+* View available slots
+* Book appointments
+* Cancel appointments
+* Reschedule appointments
+* View appointment history
 
 ---
 
-### Prevent Double Booking
+## Double Booking Prevention
 
-System prevents duplicate bookings using:
+The system prevents concurrent bookings using:
 
-- Database Transactions
-- Row Level Locking (`lockForUpdate`)
-- Slot Status Management
-
----
-
-### Appointment Cancellation
-
-Patients can cancel appointments.
-
-When cancelled:
-
-- Appointment status becomes `cancelled`
-- Slot becomes available again
+* Database Transactions
+* Row-Level Locking (`lockForUpdate`)
+* Slot Status Validation
 
 ---
 
-### Appointment Rescheduling
+## Audit Trail
 
-Patients can reschedule appointments.
-
-Flow:
-
-```text
-Old Slot -> Available
-New Slot -> Booked
-Appointment -> Updated
-History -> Created
-Notification -> Sent
-```
-
----
-
-### Appointment History
-
-All appointment actions are tracked.
+Every appointment action is tracked.
 
 Supported actions:
 
@@ -120,15 +105,35 @@ no_show
 
 ---
 
-## Tech Stack
+# Technology Stack
 
-- Laravel 13
-- MySQL 8+
-- Laravel Sanctum
-- Queue Jobs
-- Events & Listeners
-- Service Layer
-- Repository Pattern
+* PHP 8.3+
+* Laravel 13
+* MySQL 8+
+* Laravel Sanctum
+* Laravel Queues
+* Events & Listeners
+* Service Repository Pattern
+
+---
+
+# System Architecture
+
+```text
+Controller
+      ↓
+Form Request Validation
+      ↓
+Service Layer
+      ↓
+Repository Layer
+      ↓
+Database
+      ↓
+API Resource
+      ↓
+JSON Response
+```
 
 ---
 
@@ -149,15 +154,15 @@ appointment_histories
 
 ## users
 
-Stores patients and administrators.
+Stores patient and admin information.
 
-| Column | Type |
-|----------|----------|
-| id | bigint |
-| name | string |
-| email | string |
+| Column   | Type   |
+| -------- | ------ |
+| id       | bigint |
+| name     | string |
+| email    | string |
 | password | string |
-| role | enum |
+| role     | enum   |
 
 ---
 
@@ -165,11 +170,12 @@ Stores patients and administrators.
 
 Stores doctor information.
 
-| Column | Type |
-|----------|----------|
-| id | bigint |
-| name | string |
-| email | string |
+| Column         | Type   |
+| -------------- | ------ |
+| id             | bigint |
+| name           | string |
+| email          | string |
+| specialization | string |
 
 ---
 
@@ -177,27 +183,40 @@ Stores doctor information.
 
 Stores doctor schedules.
 
-| Column | Type |
-|----------|----------|
-| doctor_id | FK |
-| date | date |
-| start_time | time |
-| end_time | time |
+| Column        | Type    |
+| ------------- | ------- |
+| doctor_id     | FK      |
+| date          | date    |
+| start_time    | time    |
+| end_time      | time    |
 | slot_duration | integer |
+
+### Constraints
+
+* No duplicate availability
+* No overlapping time ranges
 
 ---
 
 ## appointment_slots
 
-Stores generated slots.
+Stores generated appointment slots.
 
-| Column | Type |
-|----------|----------|
-| doctor_id | FK |
-| availability_id | FK |
-| start_at | datetime |
-| end_at | datetime |
-| status | enum |
+| Column          | Type     |
+| --------------- | -------- |
+| doctor_id       | FK       |
+| availability_id | FK       |
+| start_at        | datetime |
+| end_at          | datetime |
+| status          | enum     |
+
+Status values:
+
+```text
+available
+booked
+blocked
+```
 
 ---
 
@@ -205,68 +224,236 @@ Stores generated slots.
 
 Stores booking information.
 
-| Column | Type |
-|----------|----------|
-| reference_no | string |
-| patient_id | FK |
-| doctor_id | FK |
-| appointment_slot_id | FK |
-| status | enum |
+| Column              | Type   |
+| ------------------- | ------ |
+| reference_no        | string |
+| patient_id          | FK     |
+| doctor_id           | FK     |
+| appointment_slot_id | FK     |
+| status              | enum   |
+
+Status values:
+
+```text
+booked
+completed
+cancelled
+rescheduled
+no_show
+```
 
 ---
 
 ## appointment_histories
 
-Stores audit logs.
+Stores appointment activity logs.
 
-| Column | Type |
-|----------|----------|
-| appointment_id | FK |
-| action | string |
-| old_data | json |
-| new_data | json |
+| Column         | Type   |
+| -------------- | ------ |
+| appointment_id | FK     |
+| action         | string |
+| old_data       | json   |
+| new_data       | json   |
+| created_by     | FK     |
 
 ---
 
-# Architecture
+# Design Decisions
+
+## 1. Separate Availability and Appointments
+
+Availability and appointments are stored separately.
+
+Benefits:
+
+* Better normalization
+* Reduced duplication
+* Easier maintenance
+* Better scalability
+
+---
+
+## 2. Pre-Generated Slots
+
+Slots are generated once and stored in the database.
+
+Benefits:
+
+* Faster slot retrieval
+* Reduced processing during booking
+* Simpler availability checks
+
+---
+
+## 3. Service Repository Pattern
+
+### Service Layer
+
+Handles business logic:
+
+* Book Appointment
+* Cancel Appointment
+* Reschedule Appointment
+* Availability Validation
+
+### Repository Layer
+
+Handles:
+
+* Database Queries
+* CRUD Operations
+* Data Retrieval
+
+Benefits:
+
+* Separation of concerns
+* Easier testing
+* Cleaner codebase
+
+---
+
+## 4. Transaction-Based Booking
+
+All critical booking operations use database transactions.
+
+Benefits:
+
+* Data consistency
+* Atomic operations
+* Automatic rollback on failure
+
+---
+
+## 5. Row-Level Locking
+
+Booking and rescheduling use:
+
+```php
+lockForUpdate()
+```
+
+Benefits:
+
+* Prevents race conditions
+* Prevents double bookings
+* Ensures data integrity
+
+---
+
+## 6. Event-Driven Architecture
+
+Events:
 
 ```text
-Controller
-    ↓
-Request Validation
-    ↓
-Service Layer
-    ↓
-Repository Layer
-    ↓
-Database
-    ↓
-Resource
-    ↓
-JSON Response
+AppointmentBooked
+AppointmentCancelled
+AppointmentRescheduled
+```
+
+Listeners:
+
+```text
+SendNotification
+CreateAppointmentHistory
+```
+
+Benefits:
+
+* Loose coupling
+* Better maintainability
+* Easier feature expansion
+
+---
+
+## 7. Queue-Based Processing
+
+Background jobs handle:
+
+* Slot Generation
+* Email Notifications
+* SMS Notifications
+
+Benefits:
+
+* Faster API responses
+* Better user experience
+* Improved throughput
+
+---
+
+# Appointment Workflow
+
+## Booking Flow
+
+```text
+Doctor Creates Availability
+            ↓
+Generate Slots Job
+            ↓
+Patient Views Slots
+            ↓
+Patient Selects Slot
+            ↓
+Transaction Starts
+            ↓
+Lock Slot
+            ↓
+Create Appointment
+            ↓
+Update Slot Status
+            ↓
+Dispatch Event
+            ↓
+Commit Transaction
 ```
 
 ---
 
-# Folder Structure
+## Cancellation Flow
 
 ```text
-app
-├── Events
-├── Listeners
-├── Jobs
-├── Models
-├── Repositories
-├── Services
-├── Http
-│   ├── Controllers
-│   ├── Requests
-│   └── Resources
+Fetch Appointment
+        ↓
+Validate Status
+        ↓
+Transaction Starts
+        ↓
+Update Appointment
+        ↓
+Release Slot
+        ↓
+Dispatch Event
+        ↓
+Commit Transaction
 ```
 
 ---
 
-# API Endpoints
+## Reschedule Flow
+
+```text
+Fetch Appointment
+        ↓
+Lock New Slot
+        ↓
+Validate Availability
+        ↓
+Release Old Slot
+        ↓
+Book New Slot
+        ↓
+Update Appointment
+        ↓
+Create History
+        ↓
+Dispatch Event
+        ↓
+Commit Transaction
+```
+
+---
+
+# API Documentation
 
 ## Authentication
 
@@ -286,6 +473,12 @@ POST /api/login
 
 ```http
 POST /api/logout
+```
+
+Authorization Header:
+
+```text
+Authorization: Bearer {token}
 ```
 
 ---
@@ -320,6 +513,13 @@ Request:
 }
 ```
 
+Business Rules:
+
+* Doctor must exist
+* Date must be valid
+* End time must be greater than start time
+* No overlapping availability
+
 ---
 
 ## Slots
@@ -327,7 +527,16 @@ Request:
 ### Get Available Slots
 
 ```http
-GET /api/doctors/{doctor_id}/slots
+GET /api/doctors/{doctorId}/slots?date=2026-06-20
+```
+
+Response:
+
+```json
+{
+    "success": true,
+    "data": []
+}
 ```
 
 ---
@@ -345,10 +554,15 @@ Request:
 ```json
 {
     "doctor_id": 1,
-    "patient_id": 1,
-    "slot_id": 5
+    "slot_id": 10
 }
 ```
+
+Rules:
+
+* Patient must be authenticated
+* Slot must exist
+* Slot must be available
 
 ---
 
@@ -357,6 +571,11 @@ Request:
 ```http
 POST /api/appointments/{id}/cancel
 ```
+
+Rules:
+
+* Appointment must exist
+* Appointment must not already be cancelled
 
 ---
 
@@ -370,95 +589,291 @@ Request:
 
 ```json
 {
-    "appointment_slot_id": 10
+    "appointment_slot_id": 20
+}
+```
+
+Rules:
+
+* Appointment must exist
+* Appointment must not be cancelled
+* New slot must be available
+
+---
+
+### Get Appointments
+
+```http
+GET /api/appointments
+```
+
+Filters:
+
+```text
+doctor_id
+patient_id
+status
+date
+```
+
+Pagination supported.
+
+---
+
+# Standard API Response Format
+
+## Success Response
+
+```json
+{
+    "success": true,
+    "message": "Request completed successfully",
+    "data": {}
+}
+```
+
+## Error Response
+
+```json
+{
+    "success": false,
+    "message": "Validation failed",
+    "errors": {
+        "field": [
+            "Validation message"
+        ]
+    }
 }
 ```
 
 ---
 
-# Booking Flow
+# Data Volume Considerations
+
+## Assumptions
+
+* 200 Doctors
+* 10,000 Bookings Per Day
+
+Estimated Volume:
 
 ```text
-Doctor Creates Availability
-            ↓
-Generate Slots Job
-            ↓
-Patient Views Slots
-            ↓
-Patient Books Slot
-            ↓
-Slot Locked
-            ↓
-Appointment Created
-            ↓
-Event Triggered
-            ↓
-Notification Sent
+10,000 Bookings / Day
+300,000 Bookings / Month
+3.65 Million Bookings / Year
 ```
 
 ---
 
-# Reschedule Flow
+# Performance Considerations
+
+## Database Indexing
+
+Indexes are added on:
 
 ```text
-Fetch Appointment
-        ↓
-Lock New Slot
-        ↓
-Validate Slot
-        ↓
-Release Old Slot
-        ↓
-Book New Slot
-        ↓
-Update Appointment
-        ↓
-Create History
-        ↓
-Dispatch Event
-        ↓
-Send Notification
+doctor_id
+patient_id
+status
+slot_date
+created_at
 ```
 
 ---
 
-# Queue Configuration
+## Pagination
 
-Run Queue Worker:
+Large datasets use pagination.
 
-```bash
-php artisan queue:work
+```php
+Appointment::paginate(20);
 ```
+
+---
+
+## Eager Loading
+
+```php
+Appointment::with([
+    'doctor',
+    'patient',
+    'slot'
+]);
+```
+
+Prevents N+1 query issues.
+
+---
+
+## Queue Processing
+
+Heavy operations run asynchronously.
+
+Examples:
+
+* Slot Generation
+* Emails
+* Notifications
+
+---
+
+## Transactions and Locking
+
+Booking and rescheduling operations use:
+
+```php
+DB::transaction()
+lockForUpdate()
+```
+
+to guarantee consistency.
+
+---
+
+# Scalability Strategy
+
+## Phase 1
+
+Supports:
+
+```text
+200 Doctors
+10,000 Bookings / Day
+```
+
+Infrastructure:
+
+```text
+1 Application Server
+1 MySQL Database
+1 Queue Worker
+```
+
+---
+
+## Phase 2
+
+Add Redis Cache.
+
+Cache:
+
+* Doctor List
+* Available Slots
+* Availability Data
+
+---
+
+## Phase 3
+
+Add Multiple Queue Workers.
+
+Benefits:
+
+* Faster processing
+* Improved throughput
+
+---
+
+## Phase 4
+
+Add Read Replicas.
+
+```text
+Primary Database
+       ↓
+Read Replica 1
+Read Replica 2
+```
+
+Reads:
+
+```text
+Doctor Listing
+Appointment Listing
+Reports
+```
+
+Writes:
+
+```text
+Booking
+Cancellation
+Rescheduling
+```
+
+---
+
+## Phase 5
+
+Partition appointment tables.
+
+Example:
+
+```text
+appointments_2026
+appointments_2027
+appointments_2028
+```
+
+Benefits:
+
+* Faster queries
+* Smaller indexes
+* Better long-term performance
 
 ---
 
 # Installation
 
-Clone Repository
+## Clone Repository
 
 ```bash
-git clone https://github.com/MayankSurati/uniAthena-Mayank
+git clone https://github.com/your-org/doctor-appointment-system.git
 ```
 
-Run Migration
+## Install Dependencies
+
+```bash
+composer install
+```
+
+## Setup Environment
+
+```bash
+cp .env.example .env
+php artisan key:generate
+```
+
+## Configure Database
+
+```env
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=doctor_appointment
+DB_USERNAME=root
+DB_PASSWORD=
+```
+
+## Run Migrations
 
 ```bash
 php artisan migrate
 ```
 
-Run Seeder
+## Run Seeders
 
 ```bash
 php artisan db:seed
 ```
 
-Start Queue
+## Start Queue Worker
 
 ```bash
 php artisan queue:work
 ```
 
-Start Application
+## Start Application
 
 ```bash
 php artisan serve
@@ -466,20 +881,14 @@ php artisan serve
 
 ---
 
-# Scalability Considerations
+# Future Improvements
 
-- Service Repository Pattern
-- Queue Based Slot Generation
-- Transaction Based Booking
-- Row Level Locking
-- Database Indexing
-- Audit History Tracking
-- Event Driven Notifications
-- Optimized for Millions of Records
+* Redis Caching
+* SMS Integration
+* Push Notifications
+* WebSocket Real-Time Updates
+* Multi-Clinic Support
+* Multi-Tenant Architecture
+* Advanced Reporting Dashboard
 
 ---
-
-# Author
-
-Mayank Surati
-Senior Laravel Developer
