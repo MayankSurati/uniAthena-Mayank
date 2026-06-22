@@ -39,10 +39,10 @@ class AppointmentController extends Controller
         $appointment = $this->appointmentService->createAppointment($appointmentsRequest->validated());
 
         return response()->json([
-            'success' => $appointment['success'],
-            'message' => $appointment['message'],
-            'data' => $appointment['data']
-        ], $appointment['status_code']);
+            'success' => true,
+            'message' => 'Appointment booked successfully.',
+            'data' => new AppointmentResource($appointment),
+        ], 201);
     }
 
     /**
