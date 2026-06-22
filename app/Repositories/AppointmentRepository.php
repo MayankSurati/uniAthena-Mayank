@@ -63,7 +63,7 @@ class AppointmentRepository implements AppointmentRepositoryInterface
             ->findOrFail($slotId);
     }
 
-    public function updateSlot(AppointmentSlot $slot,array $data): bool
+    public function updateSlot(AppointmentSlot $slot, array $data): bool
     {
         return $slot->update($data);
     }

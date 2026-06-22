@@ -32,67 +32,49 @@ class AppointmentService
         return $this->appointmentRepository->findById($id);
     }
 
-    public function createAppointment(array $data)
+    public function createAppointment(array $data): Appointment
     {
-        return DB::transaction(function () use ($data) {
+        $appointment = DB::transaction(function () use ($data) {
 
             $slot = $this->appointmentSlotRepository
-                ->findByIdForUpdate(
-                    $data['appointment_slot_id']
-                );
+                ->findByIdForUpdate($data['appointment_slot_id']);
 
             if (! $slot) {
-                return [
-                    'success' => false,
-                    'message' => 'Slot not found.',
-                    'data' => [],
-                    'status_code' => 400
-                ];
+                throw new SlotUnavailableException('Slot not found.');
             }
 
             if ($slot->status !== 'available') {
-                return [
-                    'success' => false,
-                    'message' => 'This slot is already booked.',
-                    'data' => [],
-                    'status_code' => 201
-                ];
+                throw new SlotUnavailableException(
+                    'This slot has already been booked.'
+                );
             }
 
-            $appointment = $this->appointmentRepository
-                ->create([
-                    'reference_no' => $this->generateAppointmentReference(),
-                    'patient_id' => auth()->user()->id,
-                    'doctor_id' => $data['doctor_id'],
-                    'appointment_slot_id' => $slot->id,
-                    'notes' => $data['notes'] ?? null,
-                    'status' => 'booked',
-                ]);
+            $appointment = $this->appointmentRepository->create([
+                'reference_no' => $this->generateAppointmentReference(),
+                'patient_id' => auth()->user()->id,
+                'doctor_id' => $data['doctor_id'],
+                'appointment_slot_id' => $slot->id,
+                'notes' => $data['notes'] ?? null,
+                'status' => 'booked',
+            ]);
 
             $this->appointmentSlotRepository->update(
                 $slot->id,
-                [
-                    'status' => 'booked'
-                ]
+                ['status' => 'booked']
             );
 
-            DB::afterCommit(function () use ($appointment) {
-                AppointmentBooked::dispatch($appointment);
-            });
-
-            $appointment->load([
+            return $appointment->load([
                 'patient',
                 'doctor',
                 'slot'
             ]);
-
-            return [
-                'success' => true,
-                'message' => 'Appointment booked successfully.',
-                'data' => new AppointmentResource($appointment),
-                'status_code' => 200
-            ];
         });
+
+        DB::afterCommit(function () use ($appointment) {
+            AppointmentBooked::dispatch($appointment);
+        });
+
+        return $appointment;
     }
 
     public function updateAppointment(int $id, array $data)

@@ -20,6 +20,8 @@ class DoctorFactory extends Factory
         return [
             'name' => fake()->name(),
             'email' => fake()->unique()->safeEmail(),
+            'phone' => fake()->regexify('[6-9][0-9]{9}'),
+            'is_active' => true,
         ];
     }
 }
