@@ -6,6 +6,6 @@
 
 <p>Doctor: {{ $appointment->doctor->name }}</p>
 
-<p>Date: {{ $appointment->created_at }}</p>
+<p>Date: {{ $appointment->slot->slot_date }}</p>
 
 <p>Time: {{ $appointment->slot->formatted_time  }}</p>

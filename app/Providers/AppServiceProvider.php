@@ -27,11 +27,6 @@ class AppServiceProvider extends ServiceProvider
             AppointmentSlotRepositoryInterface::class,
             AppointmentSlotRepository::class
         );
-
-        $this->app->bind(
-            DoctorRepositoryInterface::class,
-            DoctorRepository::class,
-        );
     }
 
     /**

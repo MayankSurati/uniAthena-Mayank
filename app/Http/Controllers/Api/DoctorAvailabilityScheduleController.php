@@ -3,10 +3,10 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
-use App\Traits\ApiResponse;
-use App\Services\DoctorAvailabilityScheduleService;
 use App\Http\Requests\DoctorAvailabilityScheduleRequest;
+use App\Services\DoctorAvailabilityScheduleService;
+use App\Traits\ApiResponse;
+use Illuminate\Http\Request;
 
 class DoctorAvailabilityScheduleController extends Controller
 {
@@ -19,11 +19,11 @@ class DoctorAvailabilityScheduleController extends Controller
      */
     public function index()
     {
-        $doctors = $this->doctorAvailabilityScheduleService->getDoctors();
+        $availabilitySchedules = $this->doctorAvailabilityScheduleService->getDoctors();
+
         return $this->successResponse(
-            $doctors,
-            DoctorResource::collection($doctors->items()),
-            'Doctors Fetched Successfully',
+            $availabilitySchedules,
+            'Doctors availability schedules fetched successfully.'
         );
     }
 
@@ -32,12 +32,14 @@ class DoctorAvailabilityScheduleController extends Controller
      */
     public function store(DoctorAvailabilityScheduleRequest $doctorAvailabilityScheduleRequest)
     {
-        $availability  = $this->doctorAvailabilityScheduleService->createDoctorAvailabilitySchedule($doctorAvailabilityScheduleRequest->validated());
+        $availability = $this->doctorAvailabilityScheduleService->createDoctorAvailabilitySchedule(
+            $doctorAvailabilityScheduleRequest->validated()
+        );
 
-        return response()->json([
-            'data' => $availability,
-            'message' => $availability['message'] ?? 'Doctors Availability Schedule Successfully'
-        ]);
+        return $this->successResponse(
+            $availability,
+            $availability['message'] ?? 'Doctor availability schedule created successfully.'
+        );
     }
 
     /**
@@ -45,12 +47,9 @@ class DoctorAvailabilityScheduleController extends Controller
      */
     public function show(string $id)
     {
-        $viewSlots = $this->doctorAvailabilityScheduleService->getDoctors($id);
+        $availability = $this->doctorAvailabilityScheduleService->getDoctors($id);
 
-        return response()->json([
-            'data' => $viewSlots,
-            'message' => 'Slots listing'
-        ]);
+        return $this->successResponse($availability, 'Doctor availability details fetched successfully.');
     }
 
     /**
@@ -58,7 +57,7 @@ class DoctorAvailabilityScheduleController extends Controller
      */
     public function update(Request $request, string $id)
     {
-        //
+        return $this->errorResponse('Update action is not available.', 405);
     }
 
     /**
@@ -66,6 +65,6 @@ class DoctorAvailabilityScheduleController extends Controller
      */
     public function destroy(string $id)
     {
-        //
+        return $this->errorResponse('Delete action is not available.', 405);
     }
 }

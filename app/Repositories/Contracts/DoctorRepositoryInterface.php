@@ -2,9 +2,11 @@
 
 namespace App\Repositories\Contracts;
 
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+
 interface DoctorRepositoryInterface
 {
-    public function getAll();
+    public function getAll(int $perPage = 100): LengthAwarePaginator;
 
     public function findById(int $id);
 
@@ -13,4 +15,6 @@ interface DoctorRepositoryInterface
     public function update(int $id, array $data);
 
     public function delete(int $id);
+
+    public function slots(int $doctorId, string $date);
 }

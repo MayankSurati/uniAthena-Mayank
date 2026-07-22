@@ -14,15 +14,10 @@ class AppointmentListResource extends JsonResource
             'reference_no' => $this->reference_no,
             'status' => $this->status,
 
-            'doctor' => [
-                'id' => $this->doctor->id,
-                'name' => $this->doctor->name,
-            ],
-
+            'doctor' => $this->doctor->name,
             'patient' => [
                 'id' => $this->patient->id,
                 'name' => $this->patient->name,
-                'email' => $this->patient->email,
             ],
 
             'slot' => [
@@ -32,8 +27,6 @@ class AppointmentListResource extends JsonResource
                 'end_time' => \Carbon\Carbon::parse($this->slot->end_at)
                     ->format('h:i A'),
             ],
-
-            'created_at' => $this->created_at,
         ];
     }
 }

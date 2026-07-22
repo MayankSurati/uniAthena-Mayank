@@ -2,17 +2,15 @@
 
 namespace App\Services;
 
-use App\Repositories\DoctorAvailabilityScheduleRepository;
-use App\Models\DoctorAvailabilitySchedule;
 use App\Jobs\GenerateAppointmentSlotsJob;
-use Illuminate\Support\Facades\DB;
+use App\Models\DoctorAvailabilitySchedule;
+use App\Repositories\DoctorAvailabilityScheduleRepository;
 
 class DoctorAvailabilityScheduleService
 {
     public function __construct(
-        protected DoctorAvailabilityScheduleRepository $doctorAvailabilityScheduleRepository
-    ) {
-    }
+        private readonly DoctorAvailabilityScheduleRepository $doctorAvailabilityScheduleRepository,
+    ) {}
 
     public function getDoctors()
     {
@@ -26,30 +24,18 @@ class DoctorAvailabilityScheduleService
 
     public function createDoctorAvailabilitySchedule(array $data)
     {
-        $overlap = DoctorAvailabilitySchedule::query()
-            ->where('doctor_id', $data['doctor_id'])
-            ->where('date', $data['date'])
-            ->where('start_time', '<', $data['end_time'])
-            ->where('end_time', '>', $data['start_time'])
-            ->exists();
-
-        if ($overlap) {
+        if ($this->hasOverlap($data)) {
             return [
                 'data' => null,
-                'message' => 'Doctor availability already exists for this time range.'
+                'message' => 'Doctor availability already exists for this time range.',
             ];
         }
 
-        // DB::transaction(function () use ($data) {
+        $availability = $this->doctorAvailabilityScheduleRepository->create($data);
 
-            $availability = $this->doctorAvailabilityScheduleRepository->create($data);
+        GenerateAppointmentSlotsJob::dispatch($availability);
 
-            GenerateAppointmentSlotsJob::dispatch(
-                $availability
-            );
-            
-            return $availability;
-        // });
+        return $availability;
     }
 
     public function updateDoctor(int $id, array $data)
@@ -60,5 +46,15 @@ class DoctorAvailabilityScheduleService
     public function deleteDoctor(int $id)
     {
         return $this->doctorAvailabilityScheduleRepository->delete($id);
+    }
+
+    private function hasOverlap(array $data): bool
+    {
+        return DoctorAvailabilitySchedule::query()
+            ->where('doctor_id', $data['doctor_id'])
+            ->where('date', $data['date'])
+            ->where('start_time', '<', $data['end_time'])
+            ->where('end_time', '>', $data['start_time'])
+            ->exists();
     }
 }

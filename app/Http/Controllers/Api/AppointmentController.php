@@ -3,14 +3,14 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
-use App\Traits\ApiResponse;
-use App\Services\AppointmentService;
 use App\Http\Requests\AppointmentsRequest;
 use App\Http\Requests\CancelAppointmentRequest;
 use App\Http\Requests\RescheduleAppointmentRequest;
-use App\Http\Resources\AppointmentResource;
 use App\Http\Resources\AppointmentListResource;
+use App\Http\Resources\AppointmentResource;
+use App\Services\AppointmentService;
+use App\Traits\ApiResponse;
+use Illuminate\Http\Request;
 
 class AppointmentController extends Controller
 {
@@ -24,11 +24,12 @@ class AppointmentController extends Controller
     public function index()
     {
         $appointments = $this->appointmentService->getAppointments();
-        return $this->successResponse(
-            $appointments,
-            AppointmentListResource::collection($appointments->items()),
-            'Appointments Fetched Successfully',
-        );
+
+        return AppointmentListResource::collection($appointments)
+            ->additional([
+                'success' => true,
+                'message' => 'Appointments listing.',
+            ]);
     }
 
     /**
@@ -38,11 +39,11 @@ class AppointmentController extends Controller
     {
         $appointment = $this->appointmentService->createAppointment($appointmentsRequest->validated());
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Appointment booked successfully.',
-            'data' => new AppointmentResource($appointment),
-        ], 201);
+        return $this->successResponse(
+            new AppointmentResource($appointment),
+            'Appointment booked successfully.',
+            201
+        );
     }
 
     /**
@@ -50,12 +51,12 @@ class AppointmentController extends Controller
      */
     public function show(string $id)
     {
-        $viewSlots = $this->appointmentService->getAppointment($id);
+        $appointment = $this->appointmentService->getAppointment((int) $id);
 
-        return response()->json([
-            'data' => $viewSlots,
-            'message' => 'Slots listing'
-        ]);
+        return $this->successResponse(
+            new AppointmentResource($appointment),
+            'Appointment details fetched successfully.'
+        );
     }
 
     /**
@@ -63,7 +64,7 @@ class AppointmentController extends Controller
      */
     public function update(Request $request, string $id)
     {
-        //
+        return $this->errorResponse('Update action is not available.', 405);
     }
 
     /**
@@ -71,34 +72,32 @@ class AppointmentController extends Controller
      */
     public function destroy(string $id)
     {
-        //
+        return $this->errorResponse('Delete action is not available.', 405);
     }
 
     /**
-     * Cancel the specified Appointment in database.
+     * Cancel the specified appointment in storage.
      */
     public function cancel(CancelAppointmentRequest $cancelRequest, int $id)
     {
-        $cancel = $this->appointmentService->cancelAppointment($id, $cancelRequest->validated());
+        $appointment = $this->appointmentService->cancelAppointment($id, $cancelRequest->validated());
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Appointment cancelled successfully.',
-            'data' => new AppointmentResource($cancel),
-        ], 200);
+        return $this->successResponse(
+            new AppointmentResource($appointment),
+            'Appointment cancelled successfully.'
+        );
     }
 
     /**
-     * Reschedule appointment the specified Appointment in database.
+     * Reschedule the specified appointment in storage.
      */
     public function reschedule(RescheduleAppointmentRequest $rescheduleRequest, int $id)
     {
-        $reschedule = $this->appointmentService->rescheduleAppointment($id, $rescheduleRequest->validated());
-        
-        return response()->json([
-            'success' => true,
-            'message' => 'Appointment rescheduled successfully',
-            'data' => new AppointmentResource($reschedule),
-        ], 200);
+        $appointment = $this->appointmentService->rescheduleAppointment($id, $rescheduleRequest->validated());
+
+        return $this->successResponse(
+            new AppointmentResource($appointment),
+            'Appointment rescheduled successfully.'
+        );
     }
 }

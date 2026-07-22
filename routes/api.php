@@ -1,49 +1,42 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\Api\AuthController;
-use App\Http\Controllers\Api\DoctorController;
-use App\Http\Controllers\Api\DoctorAvailabilityScheduleController;
 use App\Http\Controllers\Api\AppointmentController;
+use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\DoctorAvailabilityScheduleController;
+use App\Http\Controllers\Api\DoctorController;
+use Illuminate\Support\Facades\Route;
 
 Route::prefix('auth')->group(function () {
+    // Route::get('login', function () {
+    //     return response()->json([
+    //         'success' => false,
+    //         'message' => 'Unauthenticated.',
+    //         'errors' => [
+    //             'auth' => ['Unauthenticated.'],
+    //         ],
+    //     ], 401);
+    // })->name('login');
 
-    Route::post('/register', [AuthController::class, 'register']);
-    Route::post('/login', [AuthController::class, 'login']);
+    Route::post('register', [AuthController::class, 'register']);
+    Route::post('login', [AuthController::class, 'login']);
 
     Route::middleware('auth:sanctum')->group(function () {
-        Route::post('/logout', [AuthController::class, 'logout']);
+        Route::get('user', [AuthController::class, 'user']);
+        Route::post('logout', [AuthController::class, 'logout']);
     });
 });
 
-Route::middleware([
-    'auth:sanctum',
-    'role:admin'
-    ])->group(function () {
-        
+Route::middleware('auth:sanctum')->group(function () {
+    
+    Route::middleware('role:admin')->group(function () {
         Route::apiResource('doctors', DoctorController::class);
-
-        Route::get('doctors/{doctor}/{date}', [DoctorController::class, 'getSlots']);
-
         Route::apiResource('doctor-availability', DoctorAvailabilityScheduleController::class);
-
-        Route::apiResource('appointment', AppointmentController::class);
-
+        Route::get('doctor/{doctor}/slots', [DoctorController::class, 'getSlots']);
+    });
+    
+    Route::middleware('role:patient')->group(function () {
+        Route::apiResource('appointments', AppointmentController::class);
         Route::post('appointment/{doctor}/cancel', [AppointmentController::class, 'cancel']);
         Route::post('appointment/{doctor}/reschedule', [AppointmentController::class, 'reschedule']);
+    });
 });
-
-Route::middleware([
-    'auth:sanctum',
-    'role:patient'
-    ])->group(function () {
-
-        Route::get('doctors/{doctor}/{date}', [DoctorController::class, 'getSlots']);
-        
-        Route::apiResource('appointment', AppointmentController::class);
-
-        Route::post('appointment/{doctor}/cancel', [AppointmentController::class, 'cancel']);
-        Route::post('appointment/{doctor}/reschedule', [AppointmentController::class, 'reschedule']);
-});
-
-

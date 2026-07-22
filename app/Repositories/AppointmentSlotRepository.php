@@ -2,7 +2,6 @@
 
 namespace App\Repositories;
 
-use App\Models\Doctor;
 use App\Models\AppointmentSlot;
 use App\Repositories\Contracts\AppointmentSlotRepositoryInterface;
 
@@ -15,7 +14,7 @@ class AppointmentSlotRepository implements AppointmentSlotRepositoryInterface
 
     public function findById(int $id)
     {
-        return AppointmentSlot::findOrFail($id);
+        return AppointmentSlot::query()->findOrFail($id);
     }
 
     public function findByIdForUpdate(int $id)
@@ -23,6 +22,15 @@ class AppointmentSlotRepository implements AppointmentSlotRepositoryInterface
         return AppointmentSlot::query()
             ->lockForUpdate()
             ->find($id);
+    }
+
+    public function findSlotForDoctorForUpdate(int $slotId, int $doctorId)
+    {
+        return AppointmentSlot::query()
+            ->where('id', $slotId)
+            ->where('doctor_id', $doctorId)
+            ->lockForUpdate()
+            ->first();
     }
 
     public function create(array $data)
@@ -34,7 +42,7 @@ class AppointmentSlotRepository implements AppointmentSlotRepositoryInterface
     {
         $appointmentSlot = $this->findById($id);
 
-        return $appointmentSlot->update($data); 
+        return $appointmentSlot->update($data);
     }
 
     public function delete(int $id)

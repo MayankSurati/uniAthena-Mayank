@@ -3,10 +3,11 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
+use App\Http\Requests\DoctorSlotRequest;
+use App\Http\Resources\BaseCollection;
 use App\Services\DoctorService;
-use App\Http\Resources\DoctorResource;
 use App\Traits\ApiResponse;
+use Illuminate\Http\Request;
 
 class DoctorController extends Controller
 {
@@ -20,11 +21,8 @@ class DoctorController extends Controller
     public function index()
     {
         $doctors = $this->doctorService->getDoctors();
-        return $this->successResponse(
-            $doctors,
-            DoctorResource::collection($doctors->items()),
-            'Doctors Fetched Successfully',
-        );
+
+        return new BaseCollection($doctors, 'Doctors listing.');
     }
 
     /**
@@ -32,7 +30,7 @@ class DoctorController extends Controller
      */
     public function store(Request $request)
     {
-        //
+        return $this->errorResponse('Create action is not available.', 405);
     }
 
     /**
@@ -42,10 +40,7 @@ class DoctorController extends Controller
     {
         $doctor = $this->doctorService->getDoctor($id);
 
-        return response()->json([
-            'data' => $doctor,
-            'message' => 'Doctor details'
-        ]);
+        return $this->successResponse($doctor, 'Doctor details fetched successfully.');
     }
 
     /**
@@ -53,7 +48,7 @@ class DoctorController extends Controller
      */
     public function update(Request $request, string $id)
     {
-        //
+        return $this->errorResponse('Update action is not available.', 405);
     }
 
     /**
@@ -61,16 +56,13 @@ class DoctorController extends Controller
      */
     public function destroy(string $id)
     {
-        //
+        return $this->errorResponse('Delete action is not available.', 405);
     }
 
-    public function getSlots(int $doctorId, string $date)
+    public function getSlots(DoctorSlotRequest $request, int $doctorId)
     {
-        $slots = $this->doctorService->getDoctorSlots($doctorId, $date);
+        $slots = $this->doctorService->getDoctorSlots($doctorId, $request->date);
 
-        return response()->json([
-            'data' => $slots,
-            'message' => empty($slots) ? 'No slots found' : 'Doctor slots details',
-        ]);
+        return new BaseCollection($slots, 'Doctor slots fetched successfully.');
     }
 }

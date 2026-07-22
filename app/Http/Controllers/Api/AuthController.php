@@ -3,27 +3,29 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use App\Http\Requests\Auth\RegisterRequest;
 use App\Models\User;
+use App\Traits\ApiResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class AuthController extends Controller
 {
+    use ApiResponse;
+
     public function register(RegisterRequest $register)
     {
         $user = User::create($register->validated());
-
         $token = $user->createToken('mobile-app')->plainTextToken;
 
-        return response()->json([
-            'success' => true,
-            'message' => 'User registered successfully',
-            'data' => [
+        return $this->successResponse(
+            [
                 'user' => $user,
                 'token' => $token,
-            ]
-        ], 201);
+            ],
+            'User registered successfully.',
+            201
+        );
     }
 
     public function login(Request $request)
@@ -34,34 +36,34 @@ class AuthController extends Controller
         ]);
 
         if (! Auth::attempt($credentials)) {
-            return response()->json([
-                'message' => 'Invalid credentials'
-            ], 401);
+            return $this->errorResponse('Invalid credentials.', 401);
         }
 
         $user = Auth::user();
-
-        // Remove old tokens (optional)
         $user->tokens()->delete();
 
-        $token = $user->createToken(
-            'api-token'
-        )->plainTextToken;
+        $token = $user->createToken('api-token')->plainTextToken;
 
-        return response()->json([
-            'token' => $token,
-            'user' => $user
-        ]);
+        return $this->successResponse(
+            [
+                'user' => $user,
+                'token' => $token,
+            ],
+            'User logged in successfully.'
+        );
     }
 
+    public function user(Request $request)
+    {
+        return $this->successResponse(
+            $request->user(),
+            'User fetched successfully.'
+        );
+    }
     public function logout(Request $request)
     {
-        $request->user()
-            ->currentAccessToken()
-            ->delete();
+        $request->user()?->currentAccessToken()?->delete();
 
-        return response()->json([
-            'message' => 'Logged out successfully'
-        ]);
+        return $this->successResponse(null, 'Logged out successfully.');
     }
 }

@@ -2,9 +2,11 @@
 
 namespace App\Repositories\Contracts;
 
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+
 interface AppointmentRepositoryInterface
 {
-    public function getAll();
+    public function getAll(int $perPage = 100): LengthAwarePaginator;
 
     public function findById(int $id);
 

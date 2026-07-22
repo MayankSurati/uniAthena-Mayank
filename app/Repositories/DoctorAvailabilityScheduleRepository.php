@@ -14,19 +14,17 @@ class DoctorAvailabilityScheduleRepository implements DoctorAvailabilitySchedule
 
     public function findById(int $id)
     {
-        return DoctorAvailabilitySchedule::findOrFail($id);
+        return DoctorAvailabilitySchedule::query()->findOrFail($id);
     }
 
     public function create(array $data)
     {
-        
         return DoctorAvailabilitySchedule::create($data);
     }
 
     public function update(int $id, array $data)
     {
         $doctorAvailabilitySchedule = $this->findById($id);
-
         $doctorAvailabilitySchedule->update($data);
 
         return $doctorAvailabilitySchedule;

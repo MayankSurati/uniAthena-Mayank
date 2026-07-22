@@ -15,23 +15,29 @@ class RoleMiddleware
      */
     public function handle(Request $request, Closure $next, string $roles): Response
     {
-        $user = auth()->user();
-        
-        if(!$user)
-        {
+        $user = $request->user();
+
+        if (! $user) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthenticated.'
+                'message' => 'Unauthenticated.',
+                'errors' => [
+                    'auth' => ['Unauthenticated.'],
+                ],
             ], 401);
         }
 
-        if(!in_array($user->role->value, [$roles]))
-        {
+        $allowedRoles = array_map('trim', explode('|', $roles));
+
+        if (! in_array($user->role->value, $allowedRoles, true)) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized access.'
+                'message' => 'You are not authorized to perform this action.',
+                'errors' => [
+                    'authorization' => ['You are not authorized to perform this action.'],
+                ],
             ], 403);
-        }
+        }   
 
         return $next($request);
     }

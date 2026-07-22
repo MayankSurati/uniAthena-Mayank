@@ -13,6 +13,8 @@ class Doctor extends Model
     protected $fillable = [
         'name',
         'email',
+        'phone',
+        'is_active',
     ];
 
     public function slots()

@@ -2,18 +2,17 @@
 
 namespace App\Services;
 
-use App\Repositories\DoctorRepository;
+use App\Repositories\Contracts\DoctorRepositoryInterface;
 
 class DoctorService
 {
     public function __construct(
-        protected DoctorRepository $doctorRepository
-    ) {
-    }
+        private readonly DoctorRepositoryInterface $doctorRepository,
+    ) {}
 
-    public function getDoctors()
+    public function getDoctors(int $perPage = 100)
     {
-        return $this->doctorRepository->getAll();
+        return $this->doctorRepository->getAll($perPage);
     }
 
     public function getDoctor(int $id)
@@ -36,8 +35,8 @@ class DoctorService
         return $this->doctorRepository->delete($id);
     }
 
-    public function getDoctorSlots(int $id, string $date)
+    public function getDoctorSlots(int $doctorId, string $date)
     {
-        return $this->doctorRepository->slots($id, $date);
+        return $this->doctorRepository->slots($doctorId, $date);
     }
 }

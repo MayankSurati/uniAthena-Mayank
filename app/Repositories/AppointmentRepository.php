@@ -5,20 +5,33 @@ namespace App\Repositories;
 use App\Models\Appointment;
 use App\Models\AppointmentSlot;
 use App\Repositories\Contracts\AppointmentRepositoryInterface;
-use Illuminate\Support\Facades\DB;
-use App\Events\AppointmentCancelled;
-
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 
 class AppointmentRepository implements AppointmentRepositoryInterface
 {
-    public function getAll()
+    public function getAll(int $perPage = 100): LengthAwarePaginator
     {
-        return Appointment::query()->latest()->paginate(15);
+        return Appointment::query()
+            ->select([
+                'id',
+                'reference_no',
+                'patient_id',
+                'doctor_id',
+                'appointment_slot_id',
+                'status',
+            ])
+            ->with([
+                'patient:id,name',
+                'doctor:id,name',
+                'slot:id,start_at,end_at,slot_date',
+            ])
+            ->latest()
+            ->paginate($perPage);
     }
 
     public function findById(int $id)
     {
-        return Appointment::findOrFail($id);
+        return Appointment::query()->findOrFail($id);
     }
 
     public function create(array $data)
@@ -68,26 +81,22 @@ class AppointmentRepository implements AppointmentRepositoryInterface
         return $slot->update($data);
     }
 
-    public function updateAppointment(Appointment $appointment,array $data): bool
+    public function updateAppointment(Appointment $appointment, array $data): bool
     {
         return $appointment->update($data);
     }
 
     public function findWithRelations(int $id)
     {
-        return Appointment::with([
-            'patient',
-            'doctor',
-            'slot'
-        ])->findOrFail($id);
+        return Appointment::query()
+            ->with(['patient', 'doctor', 'slot'])
+            ->findOrFail($id);
     }
 
-    public function refresh(int $id) 
+    public function refresh(int $id)
     {
-        return Appointment::with([
-            'patient',
-            'doctor',
-            'slot'
-        ])->findOrFail($id);
+        return Appointment::query()
+            ->with(['patient', 'doctor', 'slot'])
+            ->findOrFail($id);
     }
 }

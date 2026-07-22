@@ -2,25 +2,22 @@
 
 namespace App\Services;
 
+use App\Events\AppointmentBooked;
+use App\Events\AppointmentCancelled;
+use App\Events\AppointmentRescheduled;
+use App\Exceptions\SlotUnavailableException;
+use App\Models\Appointment;
 use App\Repositories\AppointmentRepository;
 use App\Repositories\AppointmentSlotRepository;
-use Illuminate\Support\Str;
 use Carbon\Carbon;
-use App\Models\Appointment;
 use Illuminate\Support\Facades\DB;
-use App\Events\AppointmentBooked;
-use App\Events\AppointmentRescheduled;
-use App\Events\AppointmentCancelled;
-use App\Http\Resources\AppointmentResource;
-use App\Exceptions\SlotUnavailableException;
 
 class AppointmentService
 {
     public function __construct(
-        private AppointmentRepository $appointmentRepository,
-        private AppointmentSlotRepository $appointmentSlotRepository
-    ) {
-    }
+        private readonly AppointmentRepository $appointmentRepository,
+        private readonly AppointmentSlotRepository $appointmentSlotRepository,
+    ) {}
 
     public function getAppointments()
     {
@@ -34,45 +31,29 @@ class AppointmentService
 
     public function createAppointment(array $data): Appointment
     {
-        $appointment = DB::transaction(function () use ($data) {
+        $appointment = DB::transaction(function () use ($data): Appointment {
+            $slot = $this->appointmentSlotRepository->findSlotForDoctorForUpdate(
+                $data['appointment_slot_id'],
+                $data['doctor_id']
+            );
 
-            $slot = $this->appointmentSlotRepository
-                ->findByIdForUpdate($data['appointment_slot_id']);
-
-            if (! $slot) {
-                throw new SlotUnavailableException('Slot not found.');
-            }
-
-            if ($slot->status !== 'available') {
-                throw new SlotUnavailableException(
-                    'This slot has already been booked.'
-                );
-            }
+            $this->assertSlotCanBeBooked($slot);
 
             $appointment = $this->appointmentRepository->create([
                 'reference_no' => $this->generateAppointmentReference(),
-                'patient_id' => auth()->user()->id,
+                'patient_id' => auth()->id(),
                 'doctor_id' => $data['doctor_id'],
                 'appointment_slot_id' => $slot->id,
                 'notes' => $data['notes'] ?? null,
                 'status' => 'booked',
             ]);
 
-            $this->appointmentSlotRepository->update(
-                $slot->id,
-                ['status' => 'booked']
-            );
+            $this->appointmentSlotRepository->update($slot->id, ['status' => 'booked']);
 
-            return $appointment->load([
-                'patient',
-                'doctor',
-                'slot'
-            ]);
+            return $appointment->load(['patient', 'doctor', 'slot']);
         });
 
-        DB::afterCommit(function () use ($appointment) {
-            AppointmentBooked::dispatch($appointment);
-        });
+        AppointmentBooked::dispatch($appointment);
 
         return $appointment;
     }
@@ -90,8 +71,8 @@ class AppointmentService
     public function generateAppointmentReference(): string
     {
         $date = Carbon::today()->format('Ymd');
-
-        $lastAppointment = Appointment::whereDate('created_at', today())
+        $lastAppointment = Appointment::query()
+            ->whereDate('created_at', today())
             ->latest('id')
             ->first();
 
@@ -99,41 +80,22 @@ class AppointmentService
             ? ((int) substr($lastAppointment->reference_no, -3)) + 1
             : 1;
 
-        return sprintf(
-            'APT-%s-%03d',
-            $date,
-            $sequence
-        );
+        return sprintf('APT-%s-%03d', $date, $sequence);
     }
 
     public function cancelAppointment(int $id, array $data)
     {
-        $appointment = $this->appointmentRepository
-        ->findWithRelations($id);
+        $appointment = $this->appointmentRepository->findWithRelations($id);
 
         if ($appointment->status === 'cancelled') {
-            throw new SlotUnavailableException(
-                'Appointment already cancelled.'
-            );
+            throw new SlotUnavailableException('Appointment already cancelled.');
         }
 
-        $appointment = DB::transaction(function () use ($appointment, $data) {
+        $appointment = DB::transaction(function () use ($appointment, $data): Appointment {
+            $this->appointmentRepository->cancel($appointment, $data['cancellation_reason']);
+            $this->appointmentSlotRepository->update($appointment->appointment_slot_id, ['status' => 'available']);
 
-            $this->appointmentRepository->cancel(
-                $appointment,
-                $data['cancellation_reason']
-            );
-            
-            $this->appointmentSlotRepository->update(
-                $appointment->appointment_slot_id,
-                [
-                    'status' => 'available'
-                ]
-            );
-
-            return $this->appointmentRepository->refresh(
-                $appointment->id
-            );
+            return $this->appointmentRepository->refresh($appointment->id);
         });
 
         AppointmentCancelled::dispatch($appointment);
@@ -143,60 +105,56 @@ class AppointmentService
 
     public function rescheduleAppointment(int $appointmentId, array $data)
     {
-        return DB::transaction(function () use ($appointmentId, $data) {
+        return DB::transaction(function () use ($appointmentId, $data): Appointment {
+            $appointment = $this->appointmentRepository->findAppointmentForUpdate($appointmentId);
+            $newSlot = $this->appointmentRepository->findSlotForUpdate($data['appointment_slot_id']);
 
-            $appointment = $this->appointmentRepository
-                ->findAppointmentForUpdate($appointmentId);
+            $this->assertSlotCanBeRescheduled($appointment, $newSlot);
 
-            $newSlot = $this->appointmentRepository
-                ->findSlotForUpdate(
-                    $data['appointment_slot_id']
-                );
+            $oldSlot = $this->appointmentRepository->findSlotForUpdate($appointment->appointment_slot_id);
 
-            if ($newSlot->status !== 'available')
-            {
-                throw new SlotUnavailableException(
-                    'The selected appointment slot is no longer available. Please choose another slot.'
-                );
-            }
-
-            if ($appointment->appointment_slot_id === $newSlot->id)
-            {
-                throw new SlotUnavailableException(
-                    'Appointment is already assigned to this slot.'
-                );
-            }
-
-            $oldSlot = $this->appointmentRepository
-                ->findSlotForUpdate($appointment->appointment_slot_id);
-
-            $this->appointmentRepository->updateSlot(
-                $oldSlot,
-                ['status' => 'available']
-            );
-
-            $this->appointmentRepository->updateSlot(
-                $newSlot,
-                ['status' => 'booked']
-            );
-
-            $this->appointmentRepository->updateAppointment(
-                $appointment,
-                [
-                    'appointment_slot_id' => $newSlot->id,
-                    'status' => 'rescheduled',
-                ]
-            );
-
-            $appointment->fresh([
-                'patient',
-                'doctor',
-                'slot'
+            $this->appointmentRepository->updateSlot($oldSlot, ['status' => 'available']);
+            $this->appointmentRepository->updateSlot($newSlot, ['status' => 'booked']);
+            $this->appointmentRepository->updateAppointment($appointment, [
+                'appointment_slot_id' => $newSlot->id,
+                'status' => 'rescheduled',
             ]);
+
+            $appointment->refresh();
+            $appointment->load(['patient', 'doctor', 'slot']);
 
             AppointmentRescheduled::dispatch($appointment);
 
-            return $appointment;    
+            return $appointment;
         });
+    }
+
+    private function assertSlotCanBeBooked(?object $slot): void
+    {
+        if (! $slot) {
+            throw new SlotUnavailableException('Selected slot does not belong to the selected doctor.');
+        }
+
+        if ($slot->status !== 'available') {
+            throw new SlotUnavailableException('This slot has already been booked.');
+        }
+
+        $slotDate = Carbon::parse($slot->slot_date)->startOfDay();
+        $today = Carbon::today()->startOfDay();
+
+        if ($slotDate->lt($today)) {
+            throw new SlotUnavailableException('You cannot book an appointment for a past date.');
+        }
+    }
+
+    private function assertSlotCanBeRescheduled(Appointment $appointment, object $newSlot): void
+    {
+        if ($newSlot->status !== 'available') {
+            throw new SlotUnavailableException('The selected appointment slot is no longer available. Please choose another slot.');
+        }
+
+        if ($appointment->appointment_slot_id === $newSlot->id) {
+            throw new SlotUnavailableException('Appointment is already assigned to this slot.');
+        }
     }
 }

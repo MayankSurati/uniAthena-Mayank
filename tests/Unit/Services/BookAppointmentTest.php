@@ -114,6 +114,25 @@ class BookAppointmentTest extends TestCase
         ]);
     }
 
+    public function test_allows_booking_for_today_slot_even_if_start_time_has_passed(): void
+    {
+        $service = new AppointmentService(
+            Mockery::mock(AppointmentRepositoryInterface::class),
+            Mockery::mock(AppointmentSlotRepositoryInterface::class)
+        );
+
+        $slot = new AppointmentSlot([
+            'status' => 'available',
+            'slot_date' => now()->toDateString(),
+            'start_at' => now()->subHour()->format('H:i:s'),
+        ]);
+
+        $method = new \ReflectionMethod(AppointmentService::class, 'assertSlotCanBeBooked');
+        $method->setAccessible(true);
+
+        $method->invoke($service, $slot);
+    }
+
     public function test_generates_reference_number(): void
     {
         $appointmentRepository = Mockery::mock(
